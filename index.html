@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>库存查询工具</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --primary: #1890ff;
+  --primary-light: #e6f7ff;
+  --success: #52c41a;
+  --warning: #faad14;
+  --danger: #ff4d4f;
+  --gray-50: #fafafa;
+  --gray-100: #f5f5f5;
+  --gray-200: #e8e8e8;
+  --gray-300: #d9d9d9;
+  --gray-400: #bfbfbf;
+  --gray-500: #8c8c8c;
+  --gray-600: #595959;
+  --gray-700: #404040;
+  --gray-800: #262626;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ===== Header ===== */
+.app-header {
+  background: linear-gradient(135deg, var(--primary), #096dd9);
+  color: #fff;
+  padding: 14px 16px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 12px rgba(24,144,255,0.3);
+}
+.app-header .header-top {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.app-header .title-area h1 { font-size: 17px; font-weight: 600; }
+.app-header .title-area .subtitle { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+.header-actions {
+  display: flex; gap: 6px; align-items: center;
+}
+.refresh-btn {
+  padding: 4px 10px; border-radius: 14px;
+  font-size: 12px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.15);
+  color: #fff; transition: all 0.2s;
+}
+.refresh-btn:hover { background: rgba(255,255,255,0.25); }
+.refresh-btn:active { background: rgba(255,255,255,0.35); }
+.mode-btn {
+  padding: 4px 10px; border-radius: 14px;
+  font-size: 12px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+.mode-btn.active {
+  background: rgba(255,255,255,0.3);
+  font-weight: 600;
+}
+/* Stats bar */
+.stats-bar {
+  display: flex; gap: 8px; margin-top: 10px;
+  flex-wrap: wrap;
+}
+.stat-item {
+  background: rgba(255,255,255,0.18);
+  padding: 4px 10px; border-radius: 12px;
+  font-size: 11px; white-space: nowrap;
+}
+.stat-item .stat-val { font-weight: 700; font-size: 13px; }
+
+/* ===== Search Bar ===== */
+.search-bar {
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--gray-200);
+  position: sticky; top: 72px; z-index: 99;
+}
+.search-input-wrap {
+  display: flex; gap: 8px; align-items: center;
+}
+.search-input-wrap input {
+  flex: 1; height: 38px; border: 2px solid var(--gray-300);
+  border-radius: var(--radius); padding: 0 12px;
+  font-size: 16px; outline: none;
+  transition: border-color 0.2s;
+}
+.search-input-wrap input:focus { border-color: var(--primary); }
+.search-input-wrap input.loading { background: var(--gray-100); }
+.clear-btn {
+  width: 38px; height: 38px;
+  background: var(--gray-200); color: var(--gray-600);
+  border: none; border-radius: var(--radius);
+  font-size: 16px; cursor: pointer;
+  display: none; align-items: center; justify-content: center;
+}
+.clear-btn.show { display: flex; }
+.search-hint { font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+
+/* ===== Group Card ===== */
+.group-card {
+  background: #fff; border-radius: var(--radius);
+  margin-bottom: 8px; box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+}
+.group-header {
+  padding: 10px 14px; cursor: pointer;
+}
+.group-header:hover { background: var(--gray-50); }
+.group-header .row1 {
+  display: flex; align-items: center; gap: 8px;
+}
+.group-header .group-loc {
+  font-size: 12px; font-weight: 600;
+  color: var(--primary); background: var(--primary-light);
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.group-header .group-code {
+  font-size: 14px; color: var(--gray-800);
+  font-weight: 600; flex: 1;
+}
+.group-header .group-qty {
+  font-size: 16px; font-weight: 700;
+  color: var(--danger);
+  background: #fff1f0; padding: 2px 10px;
+  border-radius: 12px; white-space: nowrap;
+}
+.group-header .arrow {
+  font-size: 12px; color: var(--gray-400);
+  transition: transform 0.2s;
+}
+.group-header .arrow.open { transform: rotate(90deg); }
+.group-header .row2 {
+  margin-top: 4px;
+  font-size: 12px; color: var(--gray-600);
+  word-break: break-all;
+}
+.group-header .row2 .bc5 {
+  color: var(--primary); font-weight: 700;
+  background: var(--primary-light);
+  padding: 1px 4px; border-radius: 3px;
+}
+.group-detail {
+  padding: 0 14px 10px;
+  border-top: 1px solid var(--gray-100);
+  display: none;
+}
+.group-detail.show { display: block; }
+.group-detail .detail-row {
+  display: flex; padding: 4px 0;
+  font-size: 12px;
+}
+.group-detail .detail-row .dl { color: var(--gray-500); min-width: 70px; }
+.group-detail .detail-row .dv { color: var(--gray-800); flex: 1; }
+
+/* ===== Result count ===== */
+.result-count {
+  font-size: 12px; color: var(--gray-500);
+  padding: 8px 4px 4px;
+}
+
+/* ===== Empty ===== */
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--gray-400);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state .text { font-size: 14px; }
+
+/* ===== Loading ===== */
+.loading-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.85);
+  display: flex; justify-content: center;
+  align-items: center; z-index: 999;
+}
+.loading-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { margin-top: 10px; font-size: 13px; color: var(--gray-500); }
+
+/* ===== Pagination ===== */
+.pagination {
+  display: flex; justify-content: center;
+  gap: 6px; padding: 12px;
+}
+.page-btn {
+  padding: 6px 12px; border: 1px solid var(--gray-300);
+  border-radius: var(--radius); background: #fff;
+  font-size: 13px; cursor: pointer; color: var(--gray-600);
+}
+.page-btn.active {
+  background: var(--primary); color: #fff;
+  border-color: var(--primary);
+}
+.page-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ===== Back to top ===== */
+.back-top {
+  position: fixed; bottom: 20px; right: 20px;
+  width: 40px; height: 40px;
+  background: var(--primary); color: #fff;
+  border-radius: 50%; text-align: center;
+  line-height: 40px; font-size: 18px;
+  box-shadow: 0 2px 8px rgba(24,144,255,0.4);
+  cursor: pointer; z-index: 90;
+  display: none;
+}
+.back-top.show { display: block; }
+
+/* ===== Desktop Toolbar (desktop mode only) ===== */
+.desktop-toolbar {
+  display: none; padding: 10px 16px;
+  background: #fff; border-bottom: 1px solid var(--gray-200);
+}
+.desktop-mode .desktop-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.dt-btn {
+  padding: 8px 18px; border-radius: var(--radius);
+  font-size: 13px; cursor: pointer;
+  border: 1px solid var(--gray-300); background: #fff;
+  color: var(--gray-700); transition: all 0.2s;
+  white-space: nowrap;
+}
+.dt-btn:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+.dt-btn.dt-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+.dt-btn.dt-primary:hover { background: #096dd9; }
+.dt-btn.dt-success { background: #52c41a; color: #fff; border-color: #52c41a; }
+.dt-btn.dt-success:hover { background: #389e0d; }
+.dt-btn.dt-danger { background: #ff4d4f; color: #fff; border-color: #ff4d4f; }
+.dt-btn.dt-danger:hover { background: #cf1322; }
+.dt-btn:disabled { opacity: 0.5; cursor: default; }
+.dt-status {
+  font-size: 12px; color: var(--gray-500);
+  display: flex; align-items: center; gap: 4px;
+}
+.dt-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+.dt-status .dot.green { background: #52c41a; }
+.dt-status .dot.red { background: #ff4d4f; }
+.dt-status .dot.yellow { background: #faad14; }
+.dt-https-warning {
+  background: #fffbe6; border: 1px solid #ffe58f;
+  border-radius: var(--radius); padding: 8px 12px;
+  font-size: 12px; color: #d48806; line-height: 1.5;
+  display: none;
+}
+
+/* ===== Upload Panel ===== */
+.upload-panel {
+  background: #fff; border-radius: var(--radius);
+  padding: 12px 16px; margin: 8px 12px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+}
+.upload-panel .upload-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.upload-btn {
+  padding: 7px 16px; border-radius: var(--radius);
+  font-size: 13px; cursor: pointer;
+  background: var(--primary); color: #fff;
+  border: none; transition: all 0.2s;
+  white-space: nowrap;
+}
+.upload-btn:hover { background: #096dd9; }
+.upload-btn:active { background: #0050b3; }
+.upload-data-info {
+  font-size: 12px; color: var(--gray-500);
+  flex: 1; min-width: 0;
+}
+.upload-success {
+  margin-top: 8px; padding: 8px 12px;
+  background: #f6ffed; border: 1px solid #b7eb8f;
+  border-radius: var(--radius); color: var(--success);
+  font-size: 13px;
+}
+
+/* ===== Desktop mode styles ===== */
+.desktop-mode .app-header { position: relative; top: auto; }
+.desktop-mode .search-bar { position: relative; top: auto; }
+
+/* ===== Desktop Table ===== */
+.desktop-table-wrap {
+  overflow-x: auto; margin: 12px;
+}
+.desktop-table {
+  width: 100%; border-collapse: collapse;
+  background: #fff; font-size: 13px;
+}
+.desktop-table th {
+  background: var(--primary); color: #fff;
+  padding: 8px 12px; text-align: left;
+  font-weight: 600; white-space: nowrap;
+}
+.desktop-table td {
+  padding: 6px 12px; border-bottom: 1px solid var(--gray-200);
+}
+.desktop-table tr:hover td { background: var(--primary-light); }
+.desktop-table .qty-cell { font-weight: 700; color: var(--danger); }
+.desktop-table .bc5-cell { color: var(--primary); font-weight: 600; }
+.desktop-table .loc-cell { color: var(--primary); font-weight: 600; }
+
+/* ===== Content ===== */
+.content { padding: 8px 12px; }
+
+/* ===== Sync Status Toast ===== */
+.sync-toast {
+  position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+  padding: 10px 20px; border-radius: 12px;
+  font-size: 13px; z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  animation: syncFadeIn 0.3s ease;
+  max-width: 90vw; text-align: center;
+}
+.sync-toast.success { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+.sync-toast.error { background: #fff2f0; color: #cf1322; border: 1px solid #ffccc7; }
+.sync-toast.warning { background: #fffbe6; color: #d48806; border: 1px solid #ffe58f; }
+.sync-toast.info { background: #e6f7ff; color: #096dd9; border: 1px solid #91d5ff; }
+@keyframes syncFadeIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div style="text-align:center">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">正在加载库存数据...</div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <!-- Header -->
+  <div class="app-header">
+    <div class="header-top">
+      <div class="title-area">
+        <h1>📦 库存查询工具 <span style="font-size:11px;vertical-align:middle;opacity:.9;background:rgba(255,255,255,.18);border-radius:8px;padding:1px 7px;margin-left:4px">v3.0</span></h1>
+        <div class="subtitle" id="headerSubtitle"></div>
+      </div>
+      <div class="header-actions">
+        <button class="refresh-btn" id="refreshBtn" onclick="refreshView()">🔄 刷新</button>
+        <button class="refresh-btn" id="resetBtn" onclick="resetToOriginal()" style="border-color:rgba(255,100,100,0.4);background:rgba(255,100,100,0.15)">↩ 恢复原始</button>
+        <div class="mode-btn active" data-mode="mobile" onclick="switchMode('mobile')">📱</div>
+        <div class="mode-btn" data-mode="desktop" onclick="switchMode('desktop')">🖥️</div>
+      </div>
+    </div>
+    <div class="stats-bar" id="statsBar"></div>
+  </div>
+
+  <!-- Desktop Toolbar (start service + deploy, only visible in desktop mode) -->
+  <div class="desktop-toolbar" id="desktopToolbar">
+    <div class="dt-https-warning" id="httpsWarning">
+      <div>📱 <strong>手机端查看模式</strong> — 固定链接访问，数据在电脑端上传后约1分钟自动更新到此页面</div>
+      <div style="margin-top:6px">👉 如需上传数据，请在电脑浏览器访问 <a href="http://localhost:3001" style="color:#096dd9;font-weight:700">http://localhost:3001</a></div>
+      <div style="margin-top:6px;font-size:12px">📌 电脑端双击桌面图标「<strong>库存查询-本地服务</strong>」可启动服务</div>
+    </div>
+    <div class="dt-status" id="serviceStatus">
+      <div class="dot yellow"></div>
+      <span>检测中...</span>
+    </div>
+    <button class="dt-btn" id="startServiceBtn" onclick="startService()">⚡ 启动服务</button>
+    <button class="dt-btn dt-primary" id="syncBtn" onclick="syncToCloud()">☁️ 同步数据</button>
+    <button class="dt-btn dt-success" id="deployBtn" onclick="deployToCloud()">🚀 部署到云端</button>
+  </div>
+
+  <!-- Upload Row (compact, always visible) -->
+  <div class="upload-panel" id="uploadPanel">
+    <div class="upload-row">
+      <button class="upload-btn" onclick="document.getElementById('fileInput').click()">📤 上传数据</button>
+      <div class="upload-data-info" id="dataSourceInfo">点击上传 XLS/XLSX 文件更新数据</div>
+      <input type="file" id="fileInput" accept=".xls,.xlsx" style="display:none">
+    </div>
+    <div id="uploadStatus"></div>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <input type="text" id="searchInput" placeholder="输入条码/编码/库位 模糊搜索..." autocomplete="off">
+      <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>
+    </div>
+    <div class="search-hint">支持条码后5位模糊匹配，边输入边搜索</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content" id="contentArea"></div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination"></div>
+
+  <!-- Back to top -->
+  <div class="back-top" id="backTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</div>
+</div>
+
+<!-- Sync status toast -->
+<div id="syncToast" class="sync-toast" style="display:none"></div>
+
+<script>
+// ===== Global State =====
+let rawData = { items: [], merged: [], locationTotals: [], meta: {} };
+let filteredMerged = [];
+let currentMode = 'mobile';
+let currentPage = 1;
+const PAGE_SIZE_MOBILE = 30;
+const PAGE_SIZE_DESKTOP = 50;
+const CACHE_KEY = 'inventory_query_data_v7';
+const CACHE_VERSION = 7;
+
+// ===== Load Data =====
+async function loadData(forceServerReload) {
+  try {
+    // Clean up ALL old version cache keys (v1-v6), NEVER delete current v7
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('inventory_query_data_v')) {
+        const ver = parseInt(key.replace('inventory_query_data_v', ''), 10);
+        if (ver && ver < CACHE_VERSION) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    if (forceServerReload) {
+      // Force reload: clear current cache too, fetch from server
+      localStorage.removeItem(CACHE_KEY);
+      const resp = await fetch('inventory-data.json?t=' + Date.now());
+      if (!resp.ok) throw new Error('Failed to fetch data');
+      rawData = await resp.json();
+      rawData._cacheVersion = CACHE_VERSION;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(rawData));
+    } else {
+      // Normal load: prefer localStorage cache (preserves uploaded data)
+      const localData = localStorage.getItem(CACHE_KEY);
+      if (localData) {
+        rawData = JSON.parse(localData);
+        // Verify data format
+        if (!rawData.merged || rawData.merged.length === 0) {
+          console.log('Invalid cache data, reloading from server');
+          localStorage.removeItem(CACHE_KEY);
+          const resp = await fetch('inventory-data.json?t=' + Date.now());
+          if (!resp.ok) throw new Error('Failed to fetch data');
+          rawData = await resp.json();
+          rawData._cacheVersion = CACHE_VERSION;
+          localStorage.setItem(CACHE_KEY, JSON.stringify(rawData));
+        } else if (!rawData.merged[0]['货品条码']) {
+          // Old format without 货品条码, reload from server
+          console.log('Old data format detected, reloading from server');
+          localStorage.removeItem(CACHE_KEY);
+          const resp = await fetch('inventory-data.json?t=' + Date.now());
+          if (!resp.ok) throw new Error('Failed to fetch data');
+          rawData = await resp.json();
+          rawData._cacheVersion = CACHE_VERSION;
+          localStorage.setItem(CACHE_KEY, JSON.stringify(rawData));
+        }
+      } else {
+        // No cache: fetch from server
+        const resp = await fetch('inventory-data.json?t=' + Date.now());
+        if (!resp.ok) throw new Error('Failed to fetch data');
+        rawData = await resp.json();
+        rawData._cacheVersion = CACHE_VERSION;
+        localStorage.setItem(CACHE_KEY, JSON.stringify(rawData));
+      }
+    }
+    initApp();
+  } catch(e) {
+    console.error('Load error:', e);
+    document.getElementById('loadingOverlay').innerHTML =
+      '<div style="text-align:center;color:#ff4d4f;padding:40px">' +
+      '<div style="font-size:48px;margin-bottom:12px">❌</div>' +
+      '<div>数据加载失败: ' + e.message + '</div></div>';
+  }
+}
+
+// ===== Refresh View (re-render current data, NO data reload) =====
+function refreshView() {
+  currentPage = 1;
+  document.getElementById('searchInput').value = '';
+  doSearch();
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '✅ 已刷新';
+  setTimeout(() => { btn.textContent = '🔄 刷新'; }, 800);
+}
+
+// ===== Reset to Original Data (clear cache + reload from server) =====
+function resetToOriginal() {
+  if (!confirm('⚠️ 确定恢复为服务器原始数据？当前上传的数据将丢失！')) return;
+  const btn = document.getElementById('resetBtn');
+  btn.textContent = '⏳ 恢复中...';
+  loadData(true).then(() => {
+    btn.textContent = '✅ 已恢复';
+    setTimeout(() => { btn.textContent = '↩ 恢复原始'; }, 800);
+    doSearch();
+  });
+}
+
+// ===== Init App =====
+function initApp() {
+  document.getElementById('loadingOverlay').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  if (window.innerWidth > 768) {
+    currentMode = 'desktop';
+  }
+
+  updateHeader();
+  switchMode(currentMode);
+  doSearch();
+
+  window.addEventListener('scroll', () => {
+    document.getElementById('backTop').classList.toggle('show', window.scrollY > 300);
+  });
+}
+
+// ===== Update Header =====
+function updateHeader() {
+  const m = rawData.meta;
+  document.getElementById('headerSubtitle').textContent =
+    `数据来源: ${m.source || '-'} | 更新: ${m.updateTime || '-'}`;
+
+  // Calculate stats
+  const totalMerged = rawData.merged.length;
+  const totalQty = rawData.merged.reduce((s, i) => s + (i['总数量'] || 0), 0);
+  // Extract zones from location names (e.g. A区, B区, etc.)
+  const zones = new Set();
+  rawData.locationTotals.forEach(loc => {
+    const name = loc['库位'];
+    // Extract zone prefix: first letter or Chinese zone prefix
+    const zone = name.match(/^([A-Z]|[A-Z]区|[A-Z]-|[\u4e00-\u9fa5]+区)/);
+    if (zone) zones.add(zone[1]);
+    else zones.add(name.charAt(0));
+  });
+
+  document.getElementById('statsBar').innerHTML =
+    `<div class="stat-item">📊 合并条数 <span class="stat-val">${totalMerged}</span></div>` +
+    `<div class="stat-item">📦 总库存 <span class="stat-val">${totalQty}</span></div>` +
+    `<div class="stat-item">📍 分区 <span class="stat-val">${zones.size}</span> 个</div>` +
+    `<div class="stat-item">🏠 库位 <span class="stat-val">${rawData.locationTotals.length}</span></div>`;
+}
+
+// ===== Update Data Source Info =====
+function updateDataSourceInfo() {
+  const infoEl = document.getElementById('dataSourceInfo');
+  if (!infoEl) return;
+  const m = rawData.meta;
+  const isUploaded = m.source && m.source !== 'inventory-data.json';
+  if (isUploaded) {
+    infoEl.innerHTML = `数据来自: <strong>${m.source}</strong> (${m.updateTime || '-'})`;
+  } else {
+    infoEl.innerHTML = `当前为服务器原始数据 — 上传新文件可更新`;
+  }
+}
+
+// ===== Search =====
+function doSearch() {
+  const keyword = document.getElementById('searchInput').value.trim();
+  const clearBtn = document.getElementById('clearBtn');
+  clearBtn.classList.toggle('show', keyword.length > 0);
+
+  let merged = rawData.merged;
+
+  if (keyword) {
+    const kw = keyword.toLowerCase();
+    merged = merged.filter(m => {
+      // Barcode last 5 digits fuzzy match
+      const barcode = String(m['货品条码']);
+      const barcode5 = barcode.slice(-5);
+      if (barcode5.toLowerCase().includes(kw) || kw.includes(barcode5.toLowerCase())) return true;
+      if (barcode.toLowerCase().includes(kw)) return true;
+      if (String(m['货品编码']).toLowerCase().includes(kw)) return true;
+      if (String(m['库位']).toLowerCase().includes(kw)) return true;
+      return false;
+    });
+  }
+
+  // Sort by 库位
+  merged.sort((a, b) => {
+    const locA = a['库位'], locB = b['库位'];
+    const zoneA = locA.charAt(0), zoneB = locB.charAt(0);
+    if (zoneA !== zoneB) return zoneA.localeCompare(zoneB);
+    return locA.localeCompare(locB);
+  });
+
+  filteredMerged = merged;
+  currentPage = 1;
+  renderView();
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  doSearch();
+}
+
+// ===== Render View =====
+function renderView() {
+  if (currentMode === 'desktop') {
+    renderDesktopTable();
+  } else {
+    renderMobileCards();
+  }
+}
+
+// ===== Mobile Cards =====
+function renderMobileCards() {
+  const pageSize = PAGE_SIZE_MOBILE;
+  const total = filteredMerged.length;
+  const start = (currentPage - 1) * pageSize;
+  const end = Math.min(start + pageSize, total);
+  const pageItems = filteredMerged.slice(start, end);
+
+  const container = document.getElementById('contentArea');
+
+  // Stats line for filtered results
+  let filterQty = filteredMerged.reduce((s, i) => s + (i['总数量'] || 0), 0);
+  let html = `<div class="result-count">`;
+  if (total === rawData.merged.length) {
+    html += `全部 ${total} 条合并记录 | 总库存 ${filterQty}`;
+  } else {
+    html += `筛选 ${total} 条 / ${rawData.merged.length} 条 | 库存 ${filterQty}`;
+  }
+  html += `</div>`;
+
+  if (total === 0) {
+    html += '<div class="empty-state"><div class="icon">🔍</div><div class="text">未找到匹配的库存记录</div></div>';
+  } else {
+    pageItems.forEach(m => {
+      const barcode5 = String(m['货品条码']).slice(-5);
+      html += `
+      <div class="group-card">
+        <div class="group-header" onclick="toggleGroup(this)">
+          <div class="row1">
+            <div class="group-loc">${m['库位']}</div>
+            <div class="group-code">${m['货品编码']}</div>
+            <div class="group-qty">${m['总数量']}</div>
+            <div class="arrow">▶</div>
+          </div>
+          <div class="row2">条码: ${m['货品条码']} <span class="bc5">${barcode5}</span></div>
+        </div>
+        <div class="group-detail">
+          <div class="detail-row"><div class="dl">库位</div><div class="dv">${m['库位']}</div></div>
+          <div class="detail-row"><div class="dl">货品编码</div><div class="dv" style="font-weight:600">${m['货品编码']}</div></div>
+          <div class="detail-row"><div class="dl">货品条码</div><div class="dv">${m['货品条码']}</div></div>
+          <div class="detail-row"><div class="dl">条码后5位</div><div class="dv" style="color:var(--primary);font-weight:600">${barcode5}</div></div>
+          <div class="detail-row"><div class="dl">数量</div><div class="dv" style="color:var(--danger);font-weight:700">${m['总数量']}</div></div>
+        </div>
+      </div>`;
+    });
+  }
+
+  container.innerHTML = html;
+  renderPagination(total, pageSize);
+}
+
+// ===== Desktop Table =====
+function renderDesktopTable() {
+  const pageSize = PAGE_SIZE_DESKTOP;
+  const total = filteredMerged.length;
+  const start = (currentPage - 1) * pageSize;
+  const end = Math.min(start + pageSize, total);
+  const pageItems = filteredMerged.slice(start, end);
+
+  let filterQty = filteredMerged.reduce((s, i) => s + (i['总数量'] || 0), 0);
+
+  const container = document.getElementById('contentArea');
+  let html = `<div class="result-count">`;
+  if (total === rawData.merged.length) {
+    html += `全部 ${total} 条合并记录 | 总库存 ${filterQty}`;
+  } else {
+    html += `筛选 ${total} 条 / ${rawData.merged.length} 条 | 库存 ${filterQty}`;
+  }
+  html += `</div>`;
+
+  html += '<div class="desktop-table-wrap"><table class="desktop-table">';
+  html += '<tr><th>库位</th><th>货品条码</th><th>条码后5位</th><th>货品编码</th><th>数量</th></tr>';
+
+  pageItems.forEach(m => {
+    const barcode5 = String(m['货品条码']).slice(-5);
+    html += `<tr>
+      <td class="loc-cell">${m['库位']}</td>
+      <td>${m['货品条码']}</td>
+      <td class="bc5-cell">${barcode5}</td>
+      <td>${m['货品编码']}</td>
+      <td class="qty-cell">${m['总数量']}</td>
+    </tr>`;
+  });
+
+  html += '</table></div>';
+  container.innerHTML = html;
+  renderPagination(total, pageSize);
+}
+
+function toggleGroup(header) {
+  const detail = header.nextElementSibling;
+  const arrow = header.querySelector('.arrow');
+  detail.classList.toggle('show');
+  arrow.classList.toggle('open');
+}
+
+// ===== Pagination =====
+function renderPagination(total, pageSize) {
+  const totalPages = Math.ceil(total / pageSize);
+  if (totalPages <= 1) {
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  html += `<button class="page-btn" ${currentPage===1?'disabled':''} onclick="goPage(${currentPage-1})">上一页</button>`;
+
+  const maxShow = 5;
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, startPage + maxShow - 1);
+  if (endPage - startPage < maxShow - 1) startPage = Math.max(1, endPage - maxShow + 1);
+
+  for (let p = startPage; p <= endPage; p++) {
+    html += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+  }
+
+  html += `<button class="page-btn" ${currentPage===totalPages?'disabled':''} onclick="goPage(${currentPage+1})">下一页</button>`;
+  html += `<span style="font-size:12px;color:var(--gray-500);padding:6px">${currentPage}/${totalPages}</span>`;
+
+  document.getElementById('pagination').innerHTML = html;
+}
+
+function goPage(page) {
+  currentPage = page;
+  renderView();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===== Mode Switch =====
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+
+  if (mode === 'desktop') {
+    document.body.classList.add('desktop-mode');
+  } else {
+    document.body.classList.remove('desktop-mode');
+  }
+
+  updateDataSourceInfo();
+  renderView();
+}
+
+// ===== File Upload =====
+function setupUpload() {
+  const input = document.getElementById('fileInput');
+  input.addEventListener('change', () => {
+    if (input.files[0]) processFile(input.files[0]);
+    input.value = ''; // Allow re-upload same file
+  });
+}
+
+function processFile(file) {
+  const status = document.getElementById('uploadStatus');
+  status.innerHTML = '<div class="upload-progress">⏳ 正在解析文件...</div>';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet);
+
+      const items = json.map(row => {
+        const barcode = row['货品条码'] || row['条码'] || row['barcode'] || '';
+        const location = row['库位'] || row['location'] || '';
+        const code = row['货品编码'] || row['编码'] || row['code'] || '';
+        const qty = row['存货数量'] || row['数量'] || row['quantity'] || 0;
+        return {
+          '货品条码': String(barcode),
+          '库位': String(location),
+          '货品编码': String(code),
+          '存货数量': parseInt(qty) || 0
+        };
+      }).filter(i => i['货品条码'] || i['库位']);
+
+      // Build merged data: by 库位+货品条码
+      const merged = {};
+      items.forEach(item => {
+        const key = `${item['库位']}|${item['货品条码']}`;
+        if (!merged[key]) {
+          merged[key] = {
+            '库位': item['库位'],
+            '货品条码': item['货品条码'],
+            '货品编码': item['货品编码'],
+            '总数量': 0,
+          };
+        }
+        merged[key]['总数量'] += item['存货数量'];
+      });
+
+      const mergedList = Object.values(merged);
+
+      // Build location totals
+      const locTotals = {};
+      mergedList.forEach(m => {
+        locTotals[m['库位']] = (locTotals[m['库位']] || 0) + m['总数量'];
+      });
+      const locList = Object.entries(locTotals).map(([k, v]) => ({ '库位': k, '总库存': v })).sort((a, b) => a['库位'].localeCompare(b['库位']));
+
+      rawData = {
+        items: items,
+        merged: mergedList,
+        locationTotals: locList,
+        meta: {
+          totalItems: items.length,
+          totalMerged: mergedList.length,
+          totalLocations: locList.length,
+          updateTime: new Date().toISOString().slice(0, 10),
+          source: file.name
+        }
+      };
+
+      rawData._cacheVersion = CACHE_VERSION;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(rawData));
+
+      status.innerHTML = `<div class="upload-success">✅ 数据更新成功！${items.length} 条明细 → ${mergedList.length} 条合并 | ${locList.length} 个库位<br><small>数据已保存到本设备，刷新页面不会丢失</small></div>`;
+      updateHeader();
+      updateDataSourceInfo();
+      doSearch();
+
+      // Auto-try sync to local server
+      autoSyncAfterUpload();
+
+    } catch(err) {
+      status.innerHTML = `<div class="upload-success" style="background:#fff2f0;border-color:#ffccc7;color:#ff4d4f">❌ 解析失败: ${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ===== Real-time search on input =====
+let _debounceTimer = null;
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('searchInput');
+  searchInput.addEventListener('input', function() {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(() => doSearch(), 200);
+  });
+});
+
+// ===== Init =====
+setupUpload();
+loadData();
+checkServiceStatus();
+
+// ===== Service Status Check =====
+const IS_HTTPS = window.location.protocol === 'https:';
+const LOCAL_URL = 'http://localhost:3001';
+const SYNC_URL = LOCAL_URL + '/sync';
+const SYNC_STATUS_URL = LOCAL_URL + '/status';
+const DEPLOY_URL = LOCAL_URL + '/deploy';
+let _serviceRunning = null;
+
+// Show HTTPS warning immediately if on cloud
+if (IS_HTTPS) {
+  document.addEventListener('DOMContentLoaded', function() {
+    const warning = document.getElementById('httpsWarning');
+    if (warning) warning.style.display = 'block';
+    // Disable sync/deploy buttons on HTTPS (they won't work)
+    const syncBtn = document.getElementById('syncBtn');
+    const deployBtn = document.getElementById('deployBtn');
+    const startBtn = document.getElementById('startServiceBtn');
+    if (syncBtn) { syncBtn.disabled = true; syncBtn.title = '云端模式下不可用'; }
+    if (deployBtn) { deployBtn.title = '云端模式下不可用'; }
+    if (startBtn) { startBtn.disabled = true; startBtn.title = '云端模式下不可用'; }
+  });
+}
+
+async function checkServiceStatus() {
+  const statusEl = document.getElementById('serviceStatus');
+  const startBtn = document.getElementById('startServiceBtn');
+  if (!statusEl) return false;
+
+  // If on HTTPS, can't reach localhost — skip check
+  if (IS_HTTPS) {
+    statusEl.innerHTML = '<div class="dot red"></div><span>云端模式（请在localhost访问）</span>';
+    return false;
+  }
+
+  try {
+    const resp = await fetch(SYNC_STATUS_URL, { method: 'GET', signal: AbortSignal.timeout(3000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      _serviceRunning = true;
+      statusEl.innerHTML = '<div class="dot green"></div><span>服务已启动 ✓</span>';
+      startBtn.textContent = '⚡ 服务已运行';
+      startBtn.classList.add('dt-success');
+      startBtn.disabled = true;
+
+      // Hide HTTPS warning (not needed since we're on localhost)
+      const warning = document.getElementById('httpsWarning');
+      if (warning) warning.style.display = 'none';
+
+      // Check deploy pending flag
+      if (data.deployPending) {
+        const deployBtn = document.getElementById('deployBtn');
+        deployBtn.textContent = '🚀 需要部署';
+        deployBtn.classList.remove('dt-success');
+        deployBtn.classList.add('dt-danger');
+      }
+      return true;
+    }
+  } catch(e) {
+    _serviceRunning = false;
+  }
+
+  statusEl.innerHTML = '<div class="dot red"></div><span>服务未启动</span>';
+  startBtn.textContent = '⚡ 启动服务';
+  startBtn.classList.remove('dt-success');
+  startBtn.disabled = false;
+  return false;
+}
+
+// Auto-check every 10 seconds
+setInterval(checkServiceStatus, 10000);
+
+// ===== Auto Sync After Upload =====
+async function autoSyncAfterUpload() {
+  if (IS_HTTPS) {
+    // Cloud mode: can't connect to local service
+    const uploadStatus = document.getElementById('uploadStatus');
+    const existing = uploadStatus.querySelector('.upload-success');
+    if (existing) existing.innerHTML += '<br><small style="color:#d48806">⚠️ 云端模式下无法自动同步。请在电脑浏览器访问 <b>http://localhost:3001</b> 上传数据并同步</small>';
+    return;
+  }
+
+  try {
+    const resp = await fetch(SYNC_STATUS_URL, { method: 'GET', signal: AbortSignal.timeout(3000) });
+    if (!resp.ok) {
+      const uploadStatus = document.getElementById('uploadStatus');
+      const existing = uploadStatus.querySelector('.upload-success');
+      if (existing) existing.innerHTML += '<br><small style="color:#d48806">⚠️ 同步服务未启动，数据仅保存在本设备。点击"⚡启动服务"后可同步到手机</small>';
+      return;
+    }
+
+    const dataToSync = JSON.parse(JSON.stringify(rawData));
+    delete dataToSync._cacheVersion;
+    const syncResp = await fetch(DEPLOY_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dataToSync) });
+
+    if (syncResp.ok) {
+      const uploadStatus = document.getElementById('uploadStatus');
+      const existing = uploadStatus.querySelector('.upload-success');
+      if (existing) existing.innerHTML += '<br><small style="color:#389e0d">☁️ 数据已同步！数据正在自动发布到固定链接，约1分钟后手机端刷新即可看到最新数据</small>';
+    }
+  } catch(e) {
+    const uploadStatus = document.getElementById('uploadStatus');
+    const existing = uploadStatus.querySelector('.upload-success');
+    if (existing) existing.innerHTML += '<br><small style="color:#d48806">⚠️ 同步服务未启动，数据仅保存在本设备。点击"⚡启动服务"后可同步</small>';
+  }
+}
+
+// ===== Start Service =====
+function startService() {
+  // 启动器所在目录
+  const batDir = 'C:\\Users\\YANGDONG\\WorkBuddy\\2026-07-08-23-52-58\\inventory-query';
+  const batFile = batDir + '\\启动同步服务.vbs';
+  const batUrl = 'file:///' + batFile.replace(/\\/g, '/');
+
+  if (IS_HTTPS) {
+    // HTTPS 模式：不能直接启动本地进程，引导用户到桌面/文件位置
+    showSyncToast('info',
+      '🚀 双击桌面上的"库存查询-本地服务"图标即可启动\n\n' +
+      '或手动打开文件夹运行启动脚本：\n' + batDir
+    );
+    // 尝试打开资源管理器（大多数浏览器允许 file:// 协议）
+    setTimeout(() => {
+      try { window.open('file:///' + batDir.replace(/\\/g, '/')); } catch(e) {}
+    }, 500);
+    return;
+  }
+
+  // HTTP 模式：检查服务是否运行，未运行则提示
+  checkServiceStatus().then(running => {
+    if (running) {
+      showSyncToast('success', '✅ 服务已运行！请使用同步/部署功能');
+    } else {
+      // 提示用户启动服务
+      const msg =
+        '⚡ 请启动本地同步服务（任选一种方式）：\n\n' +
+        '方式1: 双击桌面图标"库存查询-本地服务"\n\n' +
+        '方式2: 在文件管理器打开此目录并双击"启动同步服务.bat"\n' + batDir + '\n\n' +
+        '方式3: 复制以下命令到 cmd 运行：\n' +
+        'cd /d "' + batDir + '"\n' +
+        '"C:\\Users\\YANGDONG\\.workbuddy\\binaries\\python\\versions\\3.13.12\\python.exe" sync_server.py';
+      showSyncToast('info', msg, 12000);
+    }
+  });
+}
+
+// ===== Sync Data to Local Server =====
+async function syncToCloud() {
+  if (IS_HTTPS) {
+    showSyncToast('warning', '⚠️ 云端模式下无法同步。请在电脑浏览器访问 http://localhost:3001 使用同步功能');
+    return;
+  }
+
+  const btn = document.getElementById('syncBtn');
+  btn.textContent = '⏳ 同步中...';
+
+  try {
+    const available = await checkServiceStatus();
+    if (!available) {
+      showSyncToast('warning', '⚠️ 同步服务未启动！请先点击"⚡启动服务"按钮，或双击运行启动脚本');
+      btn.textContent = '☁️ 同步数据';
+      return;
+    }
+
+    const dataToSync = JSON.parse(JSON.stringify(rawData));
+    delete dataToSync._cacheVersion;
+
+    const resp = await fetch(SYNC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataToSync)
+    });
+
+    if (resp.ok) {
+      showSyncToast('success', '✅ 数据已同步！正在自动发布到固定云端链接（约1分钟生效）');
+      btn.textContent = '✅ 已同步';
+      setTimeout(() => { btn.textContent = '☁️ 同步数据'; }, 1500);
+    } else {
+      showSyncToast('error', '❌ 同步失败: ' + resp.status);
+      btn.textContent = '☁️ 同步数据';
+    }
+  } catch(e) {
+    showSyncToast('warning', '⚠️ 同步服务未启动！请先点击"⚡启动服务"');
+    btn.textContent = '☁️ 同步数据';
+  }
+}
+
+// ===== Deploy to Cloud =====
+async function deployToCloud() {
+  if (IS_HTTPS) {
+    // Cloud mode: can't reach local service
+    showSyncToast('info', '💡 云端模式下无法自动部署。请在电脑浏览器访问 http://localhost:3001 使用部署功能');
+    return;
+  }
+
+  const btn = document.getElementById('deployBtn');
+  btn.textContent = '⏳ 提交中...';
+
+  try {
+    const available = await checkServiceStatus();
+    if (!available) {
+      showSyncToast('warning', '⚠️ 同步服务未启动！请先点击"⚡启动服务"按钮');
+      btn.textContent = '🚀 部署到云端';
+      return;
+    }
+
+    // Step 1: Sync data + create deploy flag
+    const dataToSync = JSON.parse(JSON.stringify(rawData));
+    delete dataToSync._cacheVersion;
+
+    const resp = await fetch(DEPLOY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dataToSync)
+    });
+
+    if (resp.ok) {
+      showSyncToast('success', '✅ 部署请求已提交！数据正在自动发布到固定云端链接，约1分钟后手机端刷新即可看到最新数据');
+      btn.textContent = '✅ 部署中...';
+      setTimeout(() => { btn.textContent = '🚀 部署到云端'; }, 3000);
+    } else {
+      showSyncToast('error', '❌ 部署请求失败: ' + resp.status);
+      btn.textContent = '🚀 部署到云端';
+    }
+  } catch(e) {
+    showSyncToast('warning', '⚠️ 服务未启动！请先点击"⚡启动服务"');
+    btn.textContent = '🚀 部署到云端';
+  }
+}
+
+function showSyncToast(type, message, duration) {
+  const toast = document.getElementById('syncToast');
+  toast.className = 'sync-toast ' + type;
+  // Use innerHTML to support \n -> <br> for multi-line messages
+  toast.innerHTML = String(message).replace(/\n/g, '<br>');
+  toast.style.display = 'block';
+  // If duration not specified, use defaults
+  if (duration === undefined) {
+    duration = (type === 'success' || type === 'info') ? 8000 : 5000;
+  }
+  setTimeout(() => { toast.style.display = 'none'; }, duration);
+}
+</script>
+</body>
+</html>
